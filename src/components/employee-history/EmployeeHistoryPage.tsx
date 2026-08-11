@@ -6,15 +6,17 @@ import {
   CalendarDays,
   Clock3,
   FileText,
-  IdCard,
   MapPin,
   Search,
-  ShieldCheck,
   UserRound,
 } from "lucide-react";
 import { useState } from "react";
 import { dummyEmployeeProfiles, getEmployee360View } from "@/data/employee-history";
-import type { EmployeeProfile, KyeStatus } from "@/data/employee-history";
+import type {
+  EmployeeMutationRecord,
+  EmployeeProfile,
+  KyeStatus,
+} from "@/data/employee-history";
 
 type EmployeeHistoryTab = "overview" | "career" | "performance" | "sp" | "services";
 
@@ -45,55 +47,80 @@ function getKyeBadgeClass(status: KyeStatus) {
   return statusClass[status];
 }
 
-function createOverviewCards(employee: EmployeeProfile) {
+function renderOverviewPortfolio(employee: EmployeeProfile) {
   const { currentEmployment, identity, kyeSummary } = employee;
-
-  return [
-    {
-      title: "Current Employment",
-      icon: BriefcaseBusiness,
-      tone: "blue",
-      items: [
-        ["Company", currentEmployment.company],
-        ["Division", currentEmployment.division],
-        ["Position", currentEmployment.position],
-        ["Location", currentEmployment.location],
-      ],
-    },
-    {
-      title: "Employment Information",
-      icon: IdCard,
-      tone: "cyan",
-      items: [
-        ["Employee ID", identity.employeeId],
-        ["PG", currentEmployment.payGrade],
-        ["Status", currentEmployment.employmentStatus],
-        ["Hire Date", currentEmployment.hireDate],
-      ],
-    },
-    {
-      title: "KYE Status",
-      icon: ShieldCheck,
-      tone: "purple",
-      items: [
-        ["Current Status", kyeSummary.status],
-        ["Last Review", kyeSummary.lastUpdated],
-        ["Source", kyeSummary.source.sourceName],
-        ["Source Batch", kyeSummary.source.sourceBatch],
-      ],
-    },
-    {
-      title: "Quick Summary",
-      icon: FileText,
-      tone: "green",
-      items: [
-        ["Career Movement", "2 records"],
-        ["Performance Notes", "3 cycles"],
-        ["SP Record", "No active record"],
-        ["Service History", "12 requests"],
-      ],
-    },
+  const highlights = [
+    ["Company", currentEmployment.company],
+    ["Division", currentEmployment.division],
+    ["Position", currentEmployment.position],
+    ["Location", currentEmployment.location],
+    ["PG", currentEmployment.payGrade],
+    ["Status", currentEmployment.employmentStatus],
   ];
+  const profileFacts = [
+    ["Employee ID", identity.employeeId],
+    ["Hire Date", currentEmployment.hireDate],
+    ["Length of Service", currentEmployment.lengthOfService],
+    ["KYE Status", kyeSummary.status],
+  ];
+
+  return (
+    <article className="esm-card esm-overview-portfolio">
+      <div className="esm-overview-portfolio-main">
+        <div className="esm-overview-portfolio-title">
+          <span>
+            <BriefcaseBusiness size={20} />
+          </span>
+          <div>
+            <p>Employee 360 Overview</p>
+            <h3>{currentEmployment.position}</h3>
+            <small>
+              {currentEmployment.division} / {currentEmployment.company} /{" "}
+              {currentEmployment.location}
+            </small>
+          </div>
+        </div>
+
+        <div className="esm-overview-highlight-grid">
+          {highlights.map(([label, value]) => (
+            <div key={label}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <aside className="esm-overview-portfolio-side">
+        <div className="esm-overview-status-row">
+          <span className={`esm-soft-badge ${getKyeBadgeClass(kyeSummary.status)}`}>
+            KYE {kyeSummary.status}
+          </span>
+          <span className="esm-soft-badge blue">{kyeSummary.source.sourceName}</span>
+        </div>
+
+        <div className="esm-overview-fact-list">
+          {profileFacts.map(([label, value]) => (
+            <div key={label}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </div>
+          ))}
+        </div>
+
+        <div className="esm-overview-summary-strip">
+          <div>
+            <strong>Career</strong>
+            <span>HRIS Mutation ready</span>
+          </div>
+          <div>
+            <strong>Services</strong>
+            <span>12 requests</span>
+          </div>
+        </div>
+      </aside>
+    </article>
+  );
 }
 
 const emptyStateCopy: Record<Exclude<EmployeeHistoryTab, "overview">, string> = {
@@ -152,24 +179,203 @@ function renderRecordList<TRecord extends { id: string; source: { sourceName: st
   );
 }
 
-export function EmployeeHistoryPage() {
+function hasChanged(previousValue?: string, newValue?: string) {
+  return Boolean(previousValue && newValue && previousValue !== newValue);
+}
+
+function parseDisplayDate(value: string) {
+  const parsed = new Date(value);
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function monthDiff(from: Date, to: Date) {
+  let months =
+    (to.getFullYear() - from.getFullYear()) * 12 + to.getMonth() - from.getMonth();
+
+  if (to.getDate() < from.getDate()) {
+    months -= 1;
+  }
+
+  return Math.max(months, 0);
+}
+
+function formatDuration(from: Date | null, to: Date | null) {
+  if (!from || !to) {
+    return "-";
+  }
+
+  const totalMonths = monthDiff(from, to);
+  const years = Math.floor(totalMonths / 12);
+  const months = totalMonths % 12;
+
+  if (years && months) {
+    return `${years} ${years === 1 ? "Yr" : "Yrs"} ${months} Mo`;
+  }
+
+  if (years) {
+    return `${years} ${years === 1 ? "Yr" : "Yrs"}`;
+  }
+
+  return `${months} Mo`;
+}
+
+function ChangeCell({
+  previousValue,
+  newValue,
+}: {
+  previousValue?: string;
+  newValue?: string;
+}) {
+  const changed = hasChanged(previousValue, newValue);
+
+  return (
+    <span className={`esm-career-value${changed ? " has-change" : ""}`}>
+      {changed ? (
+        <>
+          <span>{previousValue}</span>
+          <em aria-hidden="true">-&gt;</em>
+          <strong>{newValue}</strong>
+        </>
+      ) : (
+        <strong>{newValue ?? previousValue ?? "-"}</strong>
+      )}
+    </span>
+  );
+}
+
+function renderCareerTable(records: EmployeeMutationRecord[]) {
+  if (!records.length) {
+    return (
+      <article className="esm-card esm-history-empty">
+        <span>
+          <FileText size={24} />
+        </span>
+        <h3>Career</h3>
+        <p>{emptyStateCopy.career}</p>
+      </article>
+    );
+  }
+
+  const sortedRecords = [...records].sort((left, right) => {
+    const leftDate = parseDisplayDate(left.effectiveDate)?.getTime() ?? 0;
+    const rightDate = parseDisplayDate(right.effectiveDate)?.getTime() ?? 0;
+
+    return rightDate - leftDate;
+  });
+
+  return (
+    <article className="esm-card esm-career-table-card">
+      <div className="esm-career-table-header">
+        <div>
+          <p>HRIS Mutation</p>
+          <h3>Career History</h3>
+        </div>
+        <span>{sortedRecords.length} records</span>
+      </div>
+
+      <div className="esm-career-table-wrap">
+        <table className="esm-career-table">
+          <thead>
+            <tr>
+              <th>Effective Date</th>
+              <th>Job Description</th>
+              <th>Company</th>
+              <th>Location</th>
+              <th>Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedRecords.map((record, index) => {
+              const isCurrent = index === 0;
+              const isFirst = index === sortedRecords.length - 1;
+              const effectiveDate = parseDisplayDate(record.effectiveDate);
+              const nextEffectiveDate = isCurrent
+                ? new Date()
+                : parseDisplayDate(sortedRecords[index - 1].effectiveDate);
+              const duration = formatDuration(effectiveDate, nextEffectiveDate);
+
+              return (
+                <tr
+                  className={`${isCurrent ? "is-current" : ""}${
+                    isFirst ? " is-first" : ""
+                  }`}
+                  key={record.id}
+                >
+                  <td>
+                    <strong>{record.effectiveDate}</strong>
+                  </td>
+                  <td>
+                    <span className="esm-career-value">
+                      <strong>{record.newJobDescription ?? record.previousJobDescription ?? "-"}</strong>
+                    </span>
+                  </td>
+                  <td>
+                    <ChangeCell
+                      previousValue={record.previousCompany}
+                      newValue={record.newCompany}
+                    />
+                  </td>
+                  <td>
+                    <ChangeCell
+                      previousValue={record.previousLocation}
+                      newValue={record.newLocation}
+                    />
+                  </td>
+                  <td>
+                    <span className="esm-career-duration">
+                      <strong>{isCurrent ? "Current" : duration}</strong>
+                      <small>
+                        {isCurrent ? duration : isFirst ? "First Position" : "Historical"}
+                      </small>
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  );
+}
+
+type EmployeeHistoryPageProps = {
+  employeeProfiles?: EmployeeProfile[];
+  mutationRecords?: EmployeeMutationRecord[];
+};
+
+export function EmployeeHistoryPage({
+  employeeProfiles = dummyEmployeeProfiles,
+  mutationRecords = [],
+}: EmployeeHistoryPageProps) {
   const [activeTab, setActiveTab] = useState<EmployeeHistoryTab>("overview");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeProfile | null>(null);
+  const searchableEmployees = employeeProfiles.length ? employeeProfiles : dummyEmployeeProfiles;
   const normalizedSearch = searchTerm.trim().toLowerCase();
   const canSearch = normalizedSearch.length >= 2;
-  const searchResults = dummyEmployeeProfiles.filter((employee) => {
+  const searchResults = searchableEmployees.filter((employee) => {
     const identity = employee.identity;
 
     return `${identity.employeeId} ${identity.employeeName}`
       .toLowerCase()
       .includes(normalizedSearch);
   });
-  const visibleEmployees = canSearch ? searchResults : [];
+  const visibleEmployees = canSearch ? searchResults.slice(0, 3) : [];
   const employee360 = selectedEmployee
-    ? getEmployee360View(selectedEmployee.identity.employeeId)
+    ? {
+        ...(getEmployee360View(selectedEmployee.identity.employeeId) ?? {
+          profile: selectedEmployee,
+          performanceRecords: [],
+          disciplinaryRecords: [],
+        }),
+        profile: selectedEmployee,
+        mutations: mutationRecords.filter(
+          (record) => record.employeeId === selectedEmployee.identity.employeeId,
+        ),
+      }
     : undefined;
-  const overviewCards = employee360 ? createOverviewCards(employee360.profile) : [];
 
   return (
     <section className="esm-employee-page">
@@ -313,50 +519,12 @@ export function EmployeeHistoryPage() {
             ))}
           </div>
 
-          {activeTab === "overview" && employee360 ? (
-            <section className="esm-overview-grid" aria-label="Employee overview">
-              {overviewCards.map((card) => {
-                const Icon = card.icon;
-
-                return (
-                  <article
-                    className={`esm-card esm-overview-card tone-${card.tone}`}
-                    key={card.title}
-                  >
-                    <div className="esm-overview-card-title">
-                      <span>
-                        <Icon size={18} />
-                      </span>
-                      <h3>{card.title}</h3>
-                    </div>
-                    <div className="esm-overview-list">
-                      {card.items.map(([label, value]) => (
-                        <div key={label}>
-                          <span>{label}</span>
-                          <strong>{value}</strong>
-                        </div>
-                      ))}
-                    </div>
-                  </article>
-                );
-              })}
-            </section>
-          ) : null}
+          {activeTab === "overview" && employee360
+            ? renderOverviewPortfolio(employee360.profile)
+            : null}
 
           {activeTab === "career" && employee360
-            ? renderRecordList(
-                "Career",
-                emptyStateCopy.career,
-                employee360.mutations,
-                (record) => [
-                  ["Effective Date", record.effectiveDate],
-                  ["Mutation Type", record.mutationType],
-                  ["Previous Position", record.previousPosition ?? "-"],
-                  ["New Position", record.newPosition ?? "-"],
-                  ["Previous Location", record.previousLocation ?? "-"],
-                  ["New Location", record.newLocation ?? "-"],
-                ],
-              )
+            ? renderCareerTable(employee360.mutations)
             : null}
 
           {activeTab === "performance" && employee360

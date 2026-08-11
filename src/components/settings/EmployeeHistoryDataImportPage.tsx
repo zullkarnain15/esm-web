@@ -8,6 +8,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { EmployeeMasterImportCard } from "@/components/settings/EmployeeMasterImportCard";
+import { EmployeeMutationImportCard } from "@/components/settings/EmployeeMutationImportCard";
 
 const dataSources = [
   {
@@ -15,13 +16,15 @@ const dataSources = [
     description: "Current employee profile and current employment source.",
     status: "Available",
     isAvailable: true,
+    href: "#employee-master-import",
     icon: FileSpreadsheet,
   },
   {
-    title: "Mutation",
+    title: "HRIS Mutation",
     description: "Career, job, location, and company history source.",
-    status: "Coming Soon",
-    isAvailable: false,
+    status: "Available",
+    isAvailable: true,
+    href: "#hris-mutation-import",
     icon: History,
   },
   {
@@ -84,7 +87,7 @@ export function EmployeeHistoryDataImportPage() {
                   {source.status}
                 </span>
                 {source.isAvailable ? (
-                  <Link href="#employee-master-import">Import</Link>
+                  <Link href={source.href ?? "#"}>Import</Link>
                 ) : (
                   <button disabled type="button">
                     Not Implemented
@@ -98,6 +101,7 @@ export function EmployeeHistoryDataImportPage() {
       </article>
 
       <EmployeeMasterImportCard />
+      <EmployeeMutationImportCard />
     </section>
   );
 }
