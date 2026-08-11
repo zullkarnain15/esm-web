@@ -1,0 +1,193 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model SystemCheck {
+  id        Int      @id @default(autoincrement())
+  message   String
+  createdAt DateTime @default(now())
+}
+
+enum EmployeeActiveStatus {
+  ACTIVE
+  INACTIVE
+  UNKNOWN
+}
+
+enum ImportSourceType {
+  HRIS_EMPLOYEE_MASTER
+  HRIS_MUTATION
+  PERFORMANCE
+  DISCIPLINARY
+  API
+  ESM_NATIVE
+}
+
+enum ImportBatchStatus {
+  DRAFT
+  VALIDATED
+  IMPORTED
+  FAILED
+}
+
+model Employee {
+  id                  Int                    @id @default(autoincrement())
+  employeeId          String                 @unique
+  name                String
+  birthDate           DateTime?
+  hireDate            DateTime?
+  sex                 String?
+  activeStatus        EmployeeActiveStatus   @default(UNKNOWN)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  currentEmployment   CurrentEmployment?
+  disciplinaryRecords EmployeeDisciplinary[]
+  mutationRecords     EmployeeMutation[]
+  performanceRecords  EmployeePerformance[]
+
+  @@index([name])
+}
+
+model CurrentEmployment {
+  id                  Int          @id @default(autoincrement())
+  employeeDbId        Int          @unique
+  employeeId          String       @unique
+  company             String?
+  location            String?
+  hireLocation        String?
+  regional            String?
+  department          String?
+  businessDivision    String?
+  jobCode             String?
+  jobDescription      String?
+  position            String?
+  positionDescription String?
+  personGrade         String?
+  jobGrade            String?
+  employmentStatus    String?
+  payGroup            String?
+  costCentre          String?
+  sourceBatchId       Int?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  employee            Employee     @relation(fields: [employeeDbId], references: [id], onDelete: Cascade)
+  sourceBatch         ImportBatch? @relation(fields: [sourceBatchId], references: [id])
+
+  @@index([employeeId])
+  @@index([company])
+  @@index([location])
+  @@index([sourceBatchId])
+}
+
+model EmployeeMutation {
+  id               Int          @id @default(autoincrement())
+  employeeDbId     Int
+  employeeId       String
+  effectiveDate    DateTime
+  jobCode          String?
+  jobDescription   String?
+  location         String?
+  company          String?
+  previousSnapshot Json?
+  newSnapshot      Json?
+  sourceBatchId    Int?
+  createdAt        DateTime     @default(now())
+  employee         Employee     @relation(fields: [employeeDbId], references: [id], onDelete: Cascade)
+  sourceBatch      ImportBatch? @relation(fields: [sourceBatchId], references: [id])
+
+  @@index([employeeId])
+  @@index([employeeDbId, effectiveDate])
+  @@index([effectiveDate])
+  @@index([sourceBatchId])
+}
+
+model PerformancePeriod {
+  id                   Int                   @id @default(autoincrement())
+  periodLabel          String
+  year                 Int?
+  periodStart          DateTime?
+  periodEnd            DateTime?
+  sourceBatchId        Int                   @unique
+  createdAt            DateTime              @default(now())
+  employeePerformances EmployeePerformance[]
+  sourceBatch          ImportBatch           @relation(fields: [sourceBatchId], references: [id])
+
+  @@index([year])
+}
+
+model EmployeePerformance {
+  id                  Int               @id @default(autoincrement())
+  employeeDbId        Int
+  employeeId          String
+  performancePeriodId Int
+  lastPerformance     String?
+  performance3Months  String?
+  performance6Months  String?
+  performance12Months String?
+  qualitativeCategory String?
+  /// Preserves monthly performance headers exactly as provided by the source file.
+  monthlyValues       Json?
+  sourceBatchId       Int
+  createdAt           DateTime          @default(now())
+  employee            Employee          @relation(fields: [employeeDbId], references: [id], onDelete: Cascade)
+  performancePeriod   PerformancePeriod @relation(fields: [performancePeriodId], references: [id])
+  sourceBatch         ImportBatch       @relation(fields: [sourceBatchId], references: [id])
+
+  @@index([employeeId])
+  @@index([employeeDbId])
+  @@index([performancePeriodId])
+  @@index([sourceBatchId])
+}
+
+model EmployeeDisciplinary {
+  id                   Int          @id @default(autoincrement())
+  employeeDbId         Int
+  employeeId           String
+  payGroup             String?
+  disciplinaryType     String?
+  description          String?
+  reportDate           DateTime?
+  purgeDate            DateTime?
+  disciplinaryCategory String?
+  temuanIcuRaw         String?
+  isAuditFinding       Boolean      @default(false)
+  sourceBatchId        Int?
+  createdAt            DateTime     @default(now())
+  employee             Employee     @relation(fields: [employeeDbId], references: [id], onDelete: Cascade)
+  sourceBatch          ImportBatch? @relation(fields: [sourceBatchId], references: [id])
+
+  @@index([employeeId])
+  @@index([employeeDbId])
+  @@index([reportDate])
+  @@index([sourceBatchId])
+}
+
+model ImportBatch {
+  id                  Int                    @id @default(autoincrement())
+  sourceType          ImportSourceType
+  originalFileName    String
+  sourcePeriod        String?
+  uploadedBy          String?
+  uploadedAt          DateTime               @default(now())
+  recordCount         Int                    @default(0)
+  status              ImportBatchStatus      @default(DRAFT)
+  currentEmployments  CurrentEmployment[]
+  disciplinaryRecords EmployeeDisciplinary[]
+  mutationRecords     EmployeeMutation[]
+  performancePeriod   PerformancePeriod?
+  performanceRecords  EmployeePerformance[]
+
+  @@index([sourceType])
+  @@index([sourcePeriod])
+  @@index([uploadedAt])
+}

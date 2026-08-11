@@ -1,0 +1,144 @@
+"use client";
+
+import { FileSpreadsheet, Play, UploadCloud } from "lucide-react";
+import { useActionState } from "react";
+import {
+  previewEmployeeMasterAction,
+  processEmployeeMasterAction,
+  type EmployeeMasterImportState,
+} from "@/app/settings/employee-history/data-import/actions";
+
+const initialState: EmployeeMasterImportState = {};
+
+function SummaryTile({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="esm-import-summary-tile">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+export function EmployeeMasterImportCard() {
+  const [previewState, previewAction, isPreviewPending] = useActionState(
+    previewEmployeeMasterAction,
+    initialState,
+  );
+  const [processState, processAction, isProcessPending] = useActionState(
+    processEmployeeMasterAction,
+    initialState,
+  );
+  const preview = previewState.preview;
+  const result = processState.result;
+  const payload = preview
+    ? JSON.stringify({
+        fileName: preview.fileName,
+        records: preview.records,
+      })
+    : "";
+
+  return (
+    <article className="esm-card esm-import-card" id="employee-master-import">
+      <div className="esm-card-header">
+        <div>
+          <p>HRIS Employee Master</p>
+          <h3>Import Employee Master</h3>
+          <small>
+            Upload, validate, preview, then process current employee profile data.
+          </small>
+        </div>
+        <span>V1</span>
+      </div>
+
+      <form action={previewAction} className="esm-import-upload">
+        <label>
+          <FileSpreadsheet size={18} />
+          <input accept=".xlsx" name="employeeMasterFile" type="file" />
+        </label>
+        <button disabled={isPreviewPending} type="submit">
+          <UploadCloud size={17} />
+          {isPreviewPending ? "Validating..." : "Validate File"}
+        </button>
+      </form>
+
+      {previewState.message ? (
+        <div className={`esm-import-message${preview?.ok ? " is-success" : ""}`}>
+          {previewState.message}
+        </div>
+      ) : null}
+
+      {preview ? (
+        <div className="esm-import-preview">
+          <div className="esm-import-preview-title">
+            <div>
+              <span>{preview.fileName}</span>
+              <strong>{preview.sheetName ?? "No matching sheet"}</strong>
+            </div>
+            <span className={`esm-soft-badge ${preview.ok ? "success" : "warning"}`}>
+              {preview.ok ? "Ready to Process" : "Rejected"}
+            </span>
+          </div>
+
+          <div className="esm-import-summary-grid">
+            <SummaryTile label="Total Records" value={preview.totalRecords} />
+            <SummaryTile label="New Employee" value={preview.newEmployee} />
+            <SummaryTile label="Changed" value={preview.changedEmployee} />
+            <SummaryTile label="No Change" value={preview.noChange} />
+            <SummaryTile label="Invalid / Error" value={preview.invalid} />
+          </div>
+
+          {preview.sampleChanges.length ? (
+            <div className="esm-import-change-list">
+              <span>Sample Changes</span>
+              {preview.sampleChanges.map((change) => (
+                <div key={`${change.employeeId}-${change.field}-${change.newValue}`}>
+                  <strong>{change.employeeId}</strong>
+                  <span>
+                    {change.field}: {change.previousValue || "-"} &rarr;{" "}
+                    {change.newValue || "-"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {preview.errors.length ? (
+            <div className="esm-import-error-list">
+              <span>Validation Errors</span>
+              {preview.errors.slice(0, 6).map((error) => (
+                <p key={error}>{error}</p>
+              ))}
+            </div>
+          ) : null}
+
+          <form action={processAction}>
+            <input name="employeeMasterPayload" type="hidden" value={payload} />
+            <button
+              className="esm-import-process"
+              disabled={!preview.ok || isProcessPending}
+              type="submit"
+            >
+              <Play size={16} />
+              {isProcessPending ? "Processing..." : "Process Import"}
+            </button>
+          </form>
+        </div>
+      ) : null}
+
+      {processState.message ? (
+        <div className={`esm-import-message${result?.ok ? " is-success" : ""}`}>
+          {processState.message}
+        </div>
+      ) : null}
+
+      {result ? (
+        <div className="esm-import-result">
+          <SummaryTile label="Created" value={result.created} />
+          <SummaryTile label="Updated" value={result.updated} />
+          <SummaryTile label="No Change" value={result.noChange} />
+          <SummaryTile label="Batch ID" value={result.batchId ?? 0} />
+        </div>
+      ) : null}
+    </article>
+  );
+}
