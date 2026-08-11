@@ -8,12 +8,15 @@ import {
   FileText,
   MapPin,
   Search,
+  ShieldAlert,
   UserRound,
 } from "lucide-react";
 import { useState } from "react";
 import { dummyEmployeeProfiles, getEmployee360View } from "@/data/employee-history";
 import type {
+  EmployeeDisciplinaryRecord,
   EmployeeMutationRecord,
+  EmployeePerformanceRecord,
   EmployeeProfile,
   KyeStatus,
 } from "@/data/employee-history";
@@ -47,15 +50,26 @@ function getKyeBadgeClass(status: KyeStatus) {
   return statusClass[status];
 }
 
-function renderOverviewPortfolio(employee: EmployeeProfile) {
+function renderOverviewPortfolio(
+  employee: EmployeeProfile,
+  performanceRecords: EmployeePerformanceRecord[],
+  disciplinaryRecords: EmployeeDisciplinaryRecord[],
+) {
   const { currentEmployment, identity, kyeSummary } = employee;
+  const latestPerformance = performanceRecords[0];
+  const auditFindingCount = disciplinaryRecords.filter((record) => record.isAuditFinding).length;
+  const spSummary = disciplinaryRecords.length
+    ? `${disciplinaryRecords.length} record${disciplinaryRecords.length === 1 ? "" : "s"}`
+    : "No active record";
   const highlights = [
     ["Company", currentEmployment.company],
     ["Division", currentEmployment.division],
     ["Position", currentEmployment.position],
     ["Location", currentEmployment.location],
     ["PG", currentEmployment.payGrade],
-    ["Status", currentEmployment.employmentStatus],
+    ["Last Performance", latestPerformance?.lastPerformance ?? "-"],
+    ["SP Record", spSummary],
+    ["Audit Finding", auditFindingCount ? `${auditFindingCount} finding` : "Clear"],
   ];
   const profileFacts = [
     ["Employee ID", identity.employeeId],
@@ -114,8 +128,16 @@ function renderOverviewPortfolio(employee: EmployeeProfile) {
             <span>HRIS Mutation ready</span>
           </div>
           <div>
-            <strong>Services</strong>
-            <span>12 requests</span>
+            <strong>Performance</strong>
+            <span>{latestPerformance?.periodLabel ?? "Not available"}</span>
+          </div>
+          <div className={auditFindingCount ? "has-audit" : ""}>
+            <strong>SP</strong>
+            <span>
+              {disciplinaryRecords.length
+                ? `${spSummary}${auditFindingCount ? ` / ${auditFindingCount} audit` : ""}`
+                : "No disciplinary history"}
+            </span>
           </div>
         </div>
       </aside>
@@ -129,55 +151,6 @@ const emptyStateCopy: Record<Exclude<EmployeeHistoryTab, "overview">, string> = 
   sp: "SP / disciplinary source records will be displayed here.",
   services: "Service history will be displayed here.",
 };
-
-function renderRecordList<TRecord extends { id: string; source: { sourceName: string; sourceBatch: string } }>(
-  title: string,
-  description: string,
-  records: TRecord[],
-  getItems: (record: TRecord) => [string, string][],
-) {
-  if (!records.length) {
-    return (
-      <article className="esm-card esm-history-empty">
-        <span>
-          <FileText size={24} />
-        </span>
-        <h3>{title}</h3>
-        <p>{description}</p>
-      </article>
-    );
-  }
-
-  return (
-    <section className="esm-source-record-grid" aria-label={title}>
-      {records.map((record) => (
-        <article className="esm-card esm-source-record-card" key={record.id}>
-          <div className="esm-overview-card-title">
-            <span>
-              <FileText size={18} />
-            </span>
-            <div>
-              <h3>{record.id}</h3>
-              <p>{record.source.sourceName}</p>
-            </div>
-          </div>
-          <div className="esm-overview-list">
-            {getItems(record).map(([label, value]) => (
-              <div key={label}>
-                <span>{label}</span>
-                <strong>{value}</strong>
-              </div>
-            ))}
-            <div>
-              <span>Source Batch</span>
-              <strong>{record.source.sourceBatch}</strong>
-            </div>
-          </div>
-        </article>
-      ))}
-    </section>
-  );
-}
 
 function hasChanged(previousValue?: string, newValue?: string) {
   return Boolean(previousValue && newValue && previousValue !== newValue);
@@ -340,14 +313,177 @@ function renderCareerTable(records: EmployeeMutationRecord[]) {
   );
 }
 
+function renderPerformancePanel(records: EmployeePerformanceRecord[]) {
+  if (!records.length) {
+    return (
+      <article className="esm-card esm-history-empty">
+        <span>
+          <FileText size={24} />
+        </span>
+        <h3>Performance</h3>
+        <p>{emptyStateCopy.performance}</p>
+      </article>
+    );
+  }
+
+  const sortedRecords = [...records].sort((left, right) => {
+    const leftDate = parseDisplayDate(left.recordedAt)?.getTime() ?? 0;
+    const rightDate = parseDisplayDate(right.recordedAt)?.getTime() ?? 0;
+
+    return rightDate - leftDate;
+  });
+  const latest = sortedRecords[0];
+  const monthlyValues = latest.monthlyValues ?? [];
+  const formatPerformanceNumber = (value: string | null | undefined) => {
+    if (!value) {
+      return "-";
+    }
+
+    const numeric = Number(value);
+
+    if (Number.isNaN(numeric)) {
+      return value;
+    }
+
+    return `${(numeric * 100).toFixed(1)}%`;
+  };
+  const summary = [
+    ["Performance Period", latest.periodLabel ?? "-"],
+    ["Annual Result", formatPerformanceNumber(latest.annualPerformance ?? latest.performance2025)],
+    ["3 Months", latest.threeMonthPerformance],
+    ["6 Months", latest.sixMonthPerformance],
+    ["12 Months", latest.twelveMonthPerformance],
+    ["Last Performance", latest.lastPerformance],
+  ];
+
+  return (
+    <article className="esm-card esm-performance-panel">
+      <div className="esm-performance-header">
+        <div>
+          <p>Performance Department</p>
+          <h3>Performance Snapshot</h3>
+          <small>{latest.source.sourceName}</small>
+        </div>
+        <span>{sortedRecords.length} period{sortedRecords.length === 1 ? "" : "s"}</span>
+      </div>
+
+      <div className="esm-performance-summary-grid">
+        {summary.map(([label, value]) => (
+          <div key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </div>
+
+      <div className="esm-performance-month-grid" aria-label="Monthly performance values">
+        {monthlyValues.map((item) => (
+          <div key={`${item.sequence}-${item.sourceHeader}`}>
+            <span>
+              M{item.sequence} <small>{item.sourceHeader}</small>
+            </span>
+            <strong>{formatPerformanceNumber(item.value)}</strong>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function renderDisciplinaryTable(records: EmployeeDisciplinaryRecord[]) {
+  if (!records.length) {
+    return (
+      <article className="esm-card esm-history-empty">
+        <span>
+          <ShieldAlert size={24} />
+        </span>
+        <h3>SP</h3>
+        <p>No disciplinary history found.</p>
+      </article>
+    );
+  }
+
+  const sortedRecords = [...records].sort((left, right) => {
+    const leftDate = parseDisplayDate(left.reportDate)?.getTime() ?? 0;
+    const rightDate = parseDisplayDate(right.reportDate)?.getTime() ?? 0;
+
+    return rightDate - leftDate;
+  });
+  const auditCount = sortedRecords.filter((record) => record.isAuditFinding).length;
+
+  return (
+    <article className="esm-card esm-career-table-card esm-sp-table-card">
+      <div className="esm-career-table-header esm-sp-table-header">
+        <div>
+          <p>SP / Disciplinary</p>
+          <h3>Disciplinary History</h3>
+        </div>
+        <span>
+          {sortedRecords.length} records / {auditCount} audit finding
+          {auditCount === 1 ? "" : "s"}
+        </span>
+      </div>
+
+      <div className="esm-career-table-wrap">
+        <table className="esm-career-table esm-sp-table">
+          <thead>
+            <tr>
+              <th>Report Date</th>
+              <th>SP Type</th>
+              <th>Description</th>
+              <th>Category</th>
+              <th>Purge Date</th>
+              <th>Audit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedRecords.map((record) => (
+              <tr className={record.isAuditFinding ? "is-audit" : ""} key={record.id}>
+                <td>
+                  <strong>{record.reportDate}</strong>
+                </td>
+                <td>
+                  <span className="esm-sp-type">{record.disciplinaryType ?? record.disciplineType}</span>
+                </td>
+                <td>
+                  <span className="esm-sp-description">{record.description}</span>
+                </td>
+                <td>
+                  <span className="esm-sp-category">
+                    {record.disciplinaryCategory ?? record.disciplinary}
+                  </span>
+                </td>
+                <td>
+                  <span className="esm-sp-purge">{record.purgeDate}</span>
+                </td>
+                <td>
+                  {record.isAuditFinding ? (
+                    <span className="esm-soft-badge warning">Audit Finding</span>
+                  ) : (
+                    <span className="esm-soft-badge blue">No</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  );
+}
+
 type EmployeeHistoryPageProps = {
   employeeProfiles?: EmployeeProfile[];
   mutationRecords?: EmployeeMutationRecord[];
+  performanceRecords?: EmployeePerformanceRecord[];
+  disciplinaryRecords?: EmployeeDisciplinaryRecord[];
 };
 
 export function EmployeeHistoryPage({
   employeeProfiles = dummyEmployeeProfiles,
   mutationRecords = [],
+  performanceRecords = [],
+  disciplinaryRecords = [],
 }: EmployeeHistoryPageProps) {
   const [activeTab, setActiveTab] = useState<EmployeeHistoryTab>("overview");
   const [searchTerm, setSearchTerm] = useState("");
@@ -372,6 +508,12 @@ export function EmployeeHistoryPage({
         }),
         profile: selectedEmployee,
         mutations: mutationRecords.filter(
+          (record) => record.employeeId === selectedEmployee.identity.employeeId,
+        ),
+        performanceRecords: performanceRecords.filter(
+          (record) => record.employeeId === selectedEmployee.identity.employeeId,
+        ),
+        disciplinaryRecords: disciplinaryRecords.filter(
           (record) => record.employeeId === selectedEmployee.identity.employeeId,
         ),
       }
@@ -520,7 +662,11 @@ export function EmployeeHistoryPage({
           </div>
 
           {activeTab === "overview" && employee360
-            ? renderOverviewPortfolio(employee360.profile)
+            ? renderOverviewPortfolio(
+                employee360.profile,
+                employee360.performanceRecords,
+                employee360.disciplinaryRecords,
+              )
             : null}
 
           {activeTab === "career" && employee360
@@ -528,35 +674,11 @@ export function EmployeeHistoryPage({
             : null}
 
           {activeTab === "performance" && employee360
-            ? renderRecordList(
-                "Performance",
-                emptyStateCopy.performance,
-                employee360.performanceRecords,
-                (record) => [
-                  ["Perf 2025", record.performance2025],
-                  ["3 Bulan", record.threeMonthPerformance],
-                  ["6 Bulan", record.sixMonthPerformance],
-                  ["12 Bulan", record.twelveMonthPerformance],
-                  ["Last Performance", record.lastPerformance],
-                  ["Category", record.qualitativeCategory],
-                ],
-              )
+            ? renderPerformancePanel(employee360.performanceRecords)
             : null}
 
           {activeTab === "sp" && employee360
-            ? renderRecordList(
-                "SP",
-                emptyStateCopy.sp,
-                employee360.disciplinaryRecords,
-                (record) => [
-                  ["Pay Group", record.payGroup],
-                  ["Discipline Type", record.disciplineType],
-                  ["Description", record.description],
-                  ["Report Date", record.reportDate],
-                  ["Purge Date", record.purgeDate],
-                  ["TEMUAN_ICU", record.temuanIcu],
-                ],
-              )
+            ? renderDisciplinaryTable(employee360.disciplinaryRecords)
             : null}
 
           {activeTab === "services" ? (

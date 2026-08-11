@@ -91,11 +91,11 @@ This document defines the source-to-domain mapping for Employee 360 in ESM. The 
 | SP / Disciplinary | SP | Pay Group | `payGroup` | Optional | string | Historical | Trim; preserve source value. |  |
 | SP / Disciplinary | SP | ID | `employeeId` | Required | string | Historical | Trim whitespace only; preserve source text and leading zeros. | Locked business rule: ID is EMPLID / Employee ID. Never parse as number. |
 | SP / Disciplinary | SP | Name | `employeeName` | Optional | string | Historical | Trim; preserve source value. |  |
-| SP / Disciplinary | SP | Discp Type | `disciplineType` | Optional | string | Historical | Trim; preserve source value. | Do not infer meaning of code until confirmed. |
+| SP / Disciplinary | SP | Discp Type | `disciplinaryType` | Optional | string | Historical | Trim; preserve source value. | Do not infer meaning of code until confirmed. |
 | SP / Disciplinary | SP | Descr | `description` | Optional | string | Historical | Trim; preserve source value. |  |
 | SP / Disciplinary | SP | Report Dt | `reportDate` | Optional | date | Historical | Parse as date for display/filtering. |  |
 | SP / Disciplinary | SP | Purge Dt | `purgeDate` | Optional | date | Historical | Parse as date for display/filtering. |  |
-| SP / Disciplinary | SP | Disciplinary | `disciplinary` | Optional | string | Historical | Store source category as-is. | Locked business rule: no interpretation in ESM import layer. |
+| SP / Disciplinary | SP | Disciplinary | `disciplinaryCategory` | Optional | string | Historical | Store source category as-is. | Locked business rule: no interpretation in ESM import layer. |
 | SP / Disciplinary | SP | TEMUAN_ICU | `temuanIcuRaw` | Optional | string | Historical | Store raw source value as-is. | Raw source must not be lost. |
 | SP / Disciplinary | SP | TEMUAN_ICU | `isAuditFinding` | Optional | boolean | Historical | Derived indicator from TEMUAN_ICU according to the locked source rule. | Locked business rule: TEMUAN_ICU indicates audit finding; ICU is department in Audit division. |
 

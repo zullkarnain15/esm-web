@@ -7,8 +7,10 @@ import {
   ShieldAlert,
   TrendingUp,
 } from "lucide-react";
+import { EmployeeDisciplinaryImportCard } from "@/components/settings/EmployeeDisciplinaryImportCard";
 import { EmployeeMasterImportCard } from "@/components/settings/EmployeeMasterImportCard";
 import { EmployeeMutationImportCard } from "@/components/settings/EmployeeMutationImportCard";
+import { EmployeePerformanceImportCard } from "@/components/settings/EmployeePerformanceImportCard";
 
 const dataSources = [
   {
@@ -30,15 +32,17 @@ const dataSources = [
   {
     title: "Performance",
     description: "Official yearly performance source from Performance Department.",
-    status: "Coming Soon",
-    isAvailable: false,
+    status: "Available",
+    isAvailable: true,
+    href: "#performance-import",
     icon: TrendingUp,
   },
   {
     title: "SP / Disciplinary",
     description: "Disciplinary records and audit finding source.",
-    status: "Coming Soon",
-    isAvailable: false,
+    status: "Available",
+    isAvailable: true,
+    href: "#sp-disciplinary-import",
     icon: ShieldAlert,
   },
 ];
@@ -102,6 +106,8 @@ export function EmployeeHistoryDataImportPage() {
 
       <EmployeeMasterImportCard />
       <EmployeeMutationImportCard />
+      <EmployeePerformanceImportCard />
+      <EmployeeDisciplinaryImportCard />
     </section>
   );
 }
